@@ -965,17 +965,42 @@ if [[ ! -f /etc/apt/sources.list.d/nginx.list ]]; then
 	clear
 	colorEcho ${INFO} "安装Nginx(Install Nginx ing)"
 	if [[ $dist != centos ]]; then
-	curl -LO --progress-bar https://nginx.org/keys/nginx_signing.key
-	apt-key add nginx_signing.key
-	rm -rf nginx_signing.key
-	touch /etc/apt/sources.list.d/nginx.list
-	cat > '/etc/apt/sources.list.d/nginx.list' << EOF
-deb https://nginx.org/packages/mainline/$dist/ $(lsb_release -cs) nginx
-deb-src https://nginx.org/packages/mainline/$dist/ $(lsb_release -cs) nginx
-EOF
-	apt-get purge nginx -qq -y
-	apt-get update -q
-	apt-get install nginx -q -y
+		apt-get install -y git unzip curl sudo socat build-essential libpcre3 libpcre3-dev zlibc zlib1g zlib1g-dev
+	wget http://nginx.org/download/nginx-1.17.8.tar.gz
+	#wget https://www.openssl.org/source/openssl-1.1.1d.tar.gz
+	tar -xvf nginx-1.17.8.tar.gz
+	#tar -xvf openssl-1.1.1d.tar.gz
+	rm nginx-1.17.8.tar.gz
+	#rm openssl-1.1.1d.tar.gz
+	cd nginx-1.17.8
+	sed -i 's@"nginx/"@"-/"@g' src/core/nginx.h
+	sed -i 's@r->headers_out.server == NULL@0@g' src/http/ngx_http_header_filter_module.c
+	sed -i 's@r->headers_out.server == NULL@0@g' src/http/v2/ngx_http_v2_filter_module.c
+	sed -i 's@<hr><center>nginx</center>@@g' src/http/ngx_http_special_response.c
+	./configure --prefix=/etc/nginx --sbin-path=/usr/sbin/nginx --modules-path=/usr/lib/nginx/modules --conf-path=/etc/nginx/nginx.conf --error-log-path=/var/log/nginx/error.log --http-log-path=/var/log/nginx/access.log --pid-path=/run/nginx.pid --lock-path=/var/run/nginx.lock --http-client-body-temp-path=/var/cache/nginx/client_temp --http-proxy-temp-path=/var/cache/nginx/proxy_temp --http-fastcgi-temp-path=/var/cache/nginx/fastcgi_temp --http-uwsgi-temp-path=/var/cache/nginx/uwsgi_temp --http-scgi-temp-path=/var/cache/nginx/scgi_temp --user=nginx --group=nginx --with-compat --with-file-aio --with-threads --with-http_realip_module --with-http_secure_link_module --with-http_v2_module --with-stream --with-http_flv_module --with-http_mp4_module --without-select_module --without-poll_module --with-http_stub_status_module
+	make
+	sudo make install
+	useradd -r nginx --shell=/usr/sbin/nologin
+	mkdir /etc/nginx/conf.d/
+	mkdir /var/cache/nginx/
+	mkdir /usr/share/nginx/
+	mkdir /usr/share/nginx/html/
+	cd ..
+	rm -rf nginx-1.17.8
+	rm -rf openssl-1.1.1d
+	apt-get purge build-essential -y
+	apt-get autoremove -y
+	#curl -LO --progress-bar https://nginx.org/keys/nginx_signing.key
+	#apt-key add nginx_signing.key
+	#rm -rf nginx_signing.key
+	#touch /etc/apt/sources.list.d/nginx.list
+	#cat > '/etc/apt/sources.list.d/nginx.list' << EOF
+#deb https://nginx.org/packages/mainline/$dist/ $(lsb_release -cs) nginx
+#deb-src https://nginx.org/packages/mainline/$dist/ $(lsb_release -cs) nginx
+#EOF
+	#apt-get purge nginx -qq -y
+	#apt-get update -q
+	#apt-get install nginx -q -y
  	else
  	yum install nginx -y -q
 	systemctl stop nginx
@@ -1301,7 +1326,6 @@ if [[ $dnsmasq_install == 1 ]]; then
 	chmod +x /usr/sbin/dnscrypt-proxy
 	cd ..
 	rm -rf linux-x86_64
-	#adduser --system --no-create-home --disabled-login --group dnscrypt-proxy
 	useradd -r dnscrypt-proxy --shell=/usr/sbin/nologin
 	setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/dnscrypt-proxy
 	if [[ ! -d /etc/dnscrypt-proxy/ ]]; then
@@ -1610,7 +1634,7 @@ systemctl enable trojan
         "cipher_tls13": "TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_256_GCM_SHA384",
         "prefer_server_cipher": true,
         "alpn": [
-            "http/1.1"
+            "h2"
         ],
         "reuse_session": true,
         "session_ticket": false,
@@ -1838,7 +1862,7 @@ touch /etc/nginx/conf.d/trojan.conf
 if [[ $install_trojan == 1 ]]; then
 	cat > '/etc/nginx/conf.d/trojan.conf' << EOF
 server {
-	listen 127.0.0.1:80;
+	listen 127.0.0.1:80 http2;
 	server_name $domain;
 	if (\$http_user_agent = "") { return 444; }
 	if (\$host != "$domain") { return 404; }
@@ -1888,6 +1912,7 @@ server {
 	location / {
 		root /usr/share/nginx/html;
 		index index.html;
+		http2_push_preload on;
 	}
 EOF
 fi
@@ -1912,6 +1937,7 @@ echo "        #access_log off;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_redirect off;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_intercept_errors on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_pass http://127.0.0.1:6800/jsonrpc;" >> /etc/nginx/conf.d/trojan.conf
+echo "        http2_push_preload on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_http_version 1.1;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_set_header Upgrade \$http_upgrade;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_set_header Connection "upgrade";" >> /etc/nginx/conf.d/trojan.conf
@@ -1924,6 +1950,7 @@ fi
 if [[ $install_qbt == 1 ]]; then
 echo "    location $qbtpath {" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_pass              http://127.0.0.1:8080/;" >> /etc/nginx/conf.d/trojan.conf
+echo "        http2_push_preload on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_set_header        X-Forwarded-Host        \$server_name:\$server_port;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_hide_header       Referer;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_hide_header       Origin;" >> /etc/nginx/conf.d/trojan.conf
@@ -1935,6 +1962,7 @@ fi
 if [[ $install_file == 1 ]]; then
 echo "    location $filepath {" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_pass http://127.0.0.1:8081/;" >> /etc/nginx/conf.d/trojan.conf
+echo "        http2_push_preload on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_intercept_errors on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_http_version 1.1;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_set_header Upgrade \$http_upgrade;" >> /etc/nginx/conf.d/trojan.conf
@@ -1948,6 +1976,7 @@ fi
 if [[ $install_tracker == 1 ]]; then
 echo "    location $trackerpath {" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_pass http://127.0.0.1:8000/announce;" >> /etc/nginx/conf.d/trojan.conf
+echo "        http2_push_preload on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_intercept_errors on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_http_version 1.1;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_set_header Upgrade \$http_upgrade;" >> /etc/nginx/conf.d/trojan.conf
@@ -1959,6 +1988,7 @@ echo "        error_page 502 = @errpage;" >> /etc/nginx/conf.d/trojan.conf
 echo "        }" >> /etc/nginx/conf.d/trojan.conf
 echo "    location $trackerstatuspath {" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_pass http://127.0.0.1:8000/stats;" >> /etc/nginx/conf.d/trojan.conf
+echo "        http2_push_preload on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_intercept_errors on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_http_version 1.1;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_set_header Upgrade \$http_upgrade;" >> /etc/nginx/conf.d/trojan.conf
@@ -1981,6 +2011,7 @@ echo "        proxy_pass_request_headers on;" >> /etc/nginx/conf.d/trojan.conf
 echo '        proxy_set_header Connection "keep-alive";' >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_store off;" >> /etc/nginx/conf.d/trojan.conf
 echo "        proxy_pass http://netdata/\$ndpath\$is_args\$args;" >> /etc/nginx/conf.d/trojan.conf
+echo "        http2_push_preload on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        gzip on;" >> /etc/nginx/conf.d/trojan.conf
 echo "        gzip_proxied any;" >> /etc/nginx/conf.d/trojan.conf
 echo "        gzip_types *;" >> /etc/nginx/conf.d/trojan.conf
@@ -1992,15 +2023,15 @@ echo "        }" >> /etc/nginx/conf.d/trojan.conf
 echo "}" >> /etc/nginx/conf.d/trojan.conf
 echo "" >> /etc/nginx/conf.d/trojan.conf
 echo "server {" >> /etc/nginx/conf.d/trojan.conf
-echo "    listen 80;" >> /etc/nginx/conf.d/trojan.conf
-echo "    listen [::]:80;" >> /etc/nginx/conf.d/trojan.conf
+echo "    listen 80 http2;" >> /etc/nginx/conf.d/trojan.conf
+echo "    listen [::]:80 http2;" >> /etc/nginx/conf.d/trojan.conf
 echo "    server_name $domain;" >> /etc/nginx/conf.d/trojan.conf
 echo "    return 301 https://$domain;" >> /etc/nginx/conf.d/trojan.conf
 echo "}" >> /etc/nginx/conf.d/trojan.conf
 echo "" >> /etc/nginx/conf.d/trojan.conf
 echo "server {" >> /etc/nginx/conf.d/trojan.conf
-echo "    listen 80 default_server;" >> /etc/nginx/conf.d/trojan.conf
-echo "    listen [::]:80 default_server;" >> /etc/nginx/conf.d/trojan.conf
+echo "    listen 80 default_server http2;" >> /etc/nginx/conf.d/trojan.conf
+echo "    listen [::]:80 default_server http2;" >> /etc/nginx/conf.d/trojan.conf
 echo "    server_name _;" >> /etc/nginx/conf.d/trojan.conf
 echo "    return 444;" >> /etc/nginx/conf.d/trojan.conf
 echo "}" >> /etc/nginx/conf.d/trojan.conf
