@@ -199,6 +199,10 @@ fi
 installacme(){
 	set +e
 	curl -s https://get.acme.sh | sh
+	if [[ $? != 0 ]]; then
+		colorEcho ${ERROR} "Install acme.sh fail,please check your internet availability!!!"
+		exit 1
+	fi
 	~/.acme.sh/acme.sh --upgrade --auto-upgrade
 }
 #############################
@@ -256,12 +260,19 @@ EOF
 	~/.acme.sh/acme.sh --issue --nginx -d $domain -k ec-256 --force --test --log --reloadcmd "systemctl reload trojan || true && nginx -s reload"
 	if [[ $? != 0 ]]; then
 	colorEcho ${ERROR} "证书申请测试失败，请检查VPS控制面板防火墙(80 443)是否打开!!!"
+	colorEcho ${ERROR} "请访问https://letsencrypt.status.io/检测Let's encrypt服务是否正常!!!"
 	colorEcho ${ERROR} "Domain verification fail,Pleae Open port 80 443 on VPS panel !!!"
 	exit 1
 	fi 
 	clear
 	colorEcho ${INFO} "正式证书申请ing(issuing) let\'s encrypt certificate"
 	~/.acme.sh/acme.sh --issue --nginx -d $domain -k ec-256 --force --log --reloadcmd "systemctl reload trojan || true && nginx -s reload"
+	if [[ $? != 0 ]]; then
+	colorEcho ${ERROR} "证书申请测试失败，请检查VPS控制面板防火墙(80 443)是否打开!!!"
+	colorEcho ${ERROR} "请访问https://letsencrypt.status.io/检测Let's encrypt服务是否正常!!!"
+	colorEcho ${ERROR} "Domain verification fail,Pleae Open port 80 443 on VPS panel !!!"
+	exit 1
+	fi
 	~/.acme.sh/acme.sh --installcert -d $domain --fullchainpath /etc/trojan/trojan.crt --keypath /etc/trojan/trojan.key --ecc
 	chmod +r /etc/trojan/trojan.key
 	fi
@@ -331,8 +342,8 @@ if [[ $? -ne 0 ]]; then
 	colorEcho ${WARNING} "test3 fail !"
 fi
 
-if [[ ${test1} == 0 ]] && [[ ${test2} == 0 ]] && [[ ${test3} == 0 ]]; then
-	colorEcho ${ERROR} "你的ip被墙了，滚蛋！"
+if [[ ${test1} == 0 ]] && [[ ${test2} == 0 ]] && [[ ${test3} == 0 ]] && [[ -z ${myipv6} ]]; then
+	colorEcho ${ERROR} "你的ip(v4)被墙了，滚蛋！"
 	exit 1
 fi
 
@@ -622,13 +633,13 @@ colorEcho ${INFO} "初始化中(initializing)"
 	pack="apt-get -y -qq"
 	apt-get update -q
 	export DEBIAN_FRONTEND=noninteractive
-	apt-get install sudo whiptail curl locales lsb-release e2fsprogs jq lsof -y -qq
+	apt-get install sudo whiptail curl locales lsb-release jq lsof -y -qq
  elif cat /etc/*release | grep ^NAME | grep -q Debian; then
 	dist=debian
 	pack="apt-get -y -qq"
 	apt-get update -q
 	export DEBIAN_FRONTEND=noninteractive
-	apt-get install sudo whiptail curl locales lsb-release e2fsprogs jq lsof -y -qq
+	apt-get install sudo whiptail curl locales lsb-release jq lsof -y -qq
  else
 	TERM=ansi whiptail --title "OS not SUPPORTED" --infobox "OS NOT SUPPORTED!" 8 78
 	exit 1;
@@ -860,7 +871,7 @@ systemctl daemon-reload
 	clear
 	colorEcho ${INFO} "安装所有必备软件(Install all necessary Software)"
 if [[ $dist != centos ]]; then
-	apt-get install sudo curl xz-utils wget apt-transport-https gnupg dnsutils lsb-release python-pil unzip resolvconf ntpdate systemd dbus ca-certificates locales iptables software-properties-common cron socat -q -y
+	apt-get install sudo curl xz-utils wget apt-transport-https gnupg dnsutils lsb-release python-pil unzip resolvconf ntpdate systemd dbus ca-certificates locales iptables software-properties-common cron socat e2fsprogs -q -y
 	apt-get install python3-qrcode -q -y
 else
 	$pack install sudo curl wget gnupg python3-qrcode unzip bind-utils epel-release chrony systemd dbus xz cron socat
@@ -982,7 +993,7 @@ EOF
  	else
  	yum install nginx -y -q
 	systemctl stop nginx
-	curl -LO --progress-bar https://raw.githubusercontent.com/johnrosen1/trojan-gfw-script/master/nginx_centos
+	curl -LO --progress-bar https://raw.githubusercontent.com/johnrosen1/trojan-gfw-script/master/binary/nginx_centos
 	cp -f nginx_centos /usr/sbin/nginx
 	rm nginx_centos
 	mkdir /var/cache/nginx/
@@ -1088,7 +1099,7 @@ TimeoutStopSec=infinity
 LimitNOFILE=51200
 LimitNPROC=51200
 Restart=on-failure
-RestartSec=1s
+RestartSec=3s
 
 [Install]
 WantedBy=multi-user.target
@@ -1138,7 +1149,7 @@ TimeoutStopSec=infinity
 LimitNOFILE=51200
 LimitNPROC=51200
 Restart=on-failure
-RestartSec=1s
+RestartSec=3s
 
 [Install]
 WantedBy=multi-user.target
@@ -1174,7 +1185,7 @@ ExecReload=/usr/bin/kill -HUP \$MAINPID
 ExecStop=/usr/bin/kill -s STOP \$MAINPID
 LimitNOFILE=51200
 LimitNPROC=51200
-RestartSec=1s
+RestartSec=3s
 Restart=on-failure
 
 [Install]
@@ -1189,8 +1200,93 @@ fi
 clear
 #############################################
 if [[ $install_aria = 1 ]]; then
-	ariaport=$(shuf -i 20000-60000 -n 1)
-	trackers_list=$(wget -qO- https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_all.txt |awk NF|sed ":a;N;s/\n/,/g;ta")
+	ariaport=$(shuf -i 10000-19000 -n 1)
+	#trackers_list=$(wget -qO- https://trackerslist.com/all.txt |awk NF|sed ":a;N;s/\n/,/g;ta")
+	trackers_list=$(wget -qO- https://trackerslist.com/all_aria2.txt)
+	cat > '/etc/systemd/system/aria2.service' << EOF
+[Unit]
+Description=Aria2c download manager
+Requires=network.target
+After=network.target
+
+[Service]
+Type=forking
+User=root
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/aria2c --conf-path=/etc/aria2.conf
+ExecReload=/usr/bin/kill -HUP \$MAINPID
+ExecStop=/usr/bin/kill -s STOP \$MAINPID
+LimitNOFILE=51200
+LimitNPROC=51200
+RestartSec=3s
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+	cat > '/etc/aria2.conf' << EOF
+#Do not change these settings unless you know what you are doing !
+#Global Settings###
+daemon=true
+async-dns=true
+#enable-async-dns6=true
+log-level=notice
+console-log-level=info
+human-readable=true
+log=/var/log/aria2.log
+rlimit-nofile=51200
+event-poll=epoll
+min-tls-version=TLSv1.1
+dir=/usr/share/nginx/aria2/
+file-allocation=falloc
+check-integrity=true
+conditional-get=false
+disk-cache=64M #Larger is better,but should be smaller than available RAM !
+enable-color=true
+continue=true
+always-resume=true
+max-concurrent-downloads=50
+content-disposition-default-utf8=true
+#split=16
+##Http(s) Settings#######
+enable-http-keep-alive=true
+http-accept-gzip=true
+min-split-size=10M
+max-connection-per-server=16
+lowest-speed-limit=0
+disable-ipv6=false
+max-tries=0
+#retry-wait=0
+input-file=/usr/local/bin/aria2.session
+save-session=/usr/local/bin/aria2.session
+save-session-interval=60
+force-save=true
+metalink-preferred-protocol=https
+##Rpc Settings############
+enable-rpc=true
+rpc-allow-origin-all=true
+rpc-listen-all=false
+rpc-secure=false
+rpc-listen-port=6800
+rpc-secret=$ariapasswd
+#Bittorrent Settings######
+follow-torrent=true
+listen-port=$ariaport
+enable-dht=true
+enable-dht6=true
+enable-peer-exchange=true
+seed-ratio=0
+bt-enable-lpd=true
+bt-hash-check-seed=true
+bt-seed-unverified=false
+bt-save-metadata=true
+bt-load-saved-metadata=true
+bt-require-crypto=true
+bt-force-encryption=true
+bt-min-crypto-level=arc4
+bt-max-peers=0
+bt-tracker=$trackers_list
+EOF
 	if [[ ! -f /usr/local/bin/aria2c ]]; then
 	clear
 	colorEcho ${INFO} "安装aria2(Install aria2 ing)"
@@ -1218,101 +1314,16 @@ if [[ $install_aria = 1 ]]; then
 	chmod 755 /usr/share/nginx/aria2/
 	cd ..
 	rm -rf aria2-1.35.0
-	cat > '/etc/systemd/system/aria2.service' << EOF
-[Unit]
-Description=Aria2c download manager
-Requires=network.target
-After=network.target
-		
-[Service]
-Type=forking
-User=root
-RemainAfterExit=yes
-ExecStart=/usr/local/bin/aria2c --conf-path=/etc/aria2.conf --daemon
-ExecReload=/usr/bin/kill -HUP \$MAINPID
-ExecStop=/usr/bin/kill -s STOP \$MAINPID
-LimitNOFILE=51200
-LimitNPROC=51200
-RestartSec=3s
-Restart=on-failure
-		
-[Install]
-WantedBy=multi-user.target
-EOF
-	cat > '/etc/aria2.conf' << EOF
-async-dns=true
-log-level=info
-log=/var/log/aria2.log
-rlimit-nofile=51200
-rpc-secure=false
-continue=true
-max-concurrent-downloads=50
-#split=16
-min-split-size=10M
-max-connection-per-server=16
-lowest-speed-limit=0
-disable-ipv6=false
-max-tries=0
-#retry-wait=0
-input-file=/usr/local/bin/aria2.session
-save-session=/usr/local/bin/aria2.session
-save-session-interval=60
-force-save=true
-enable-rpc=true
-rpc-allow-origin-all=true
-rpc-listen-all=false
-event-poll=epoll
-rpc-listen-port=6800
-rpc-secret=$ariapasswd
-bt-tracker=$trackers_list
-follow-torrent=true
-listen-port=$ariaport
-enable-dht=true
-enable-dht6=true
-bt-enable-lpd=true
-enable-peer-exchange=true
-seed-ratio=0
-bt-hash-check-seed=true
-bt-seed-unverified=true
-bt-save-metadata=true
-bt-require-crypto=true
-bt-force-encryption=true
-bt-min-crypto-level=arc4
-bt-max-peers=0
-dir=/usr/share/nginx/aria2/
-file-allocation=none
-disk-cache=64M
-EOF
+	fi
 systemctl daemon-reload
 systemctl enable aria2
 systemctl start aria2
-	fi
 fi
 #############################################
 if [[ $dnsmasq_install == 1 ]]; then
-	if [[ ! -f /usr/sbin/dnscrypt-proxy ]]; then
-	clear
-	colorEcho ${INFO} "安装dnscrypt-proxy(Install dnscrypt-proxy ing)"
-		if [[ $(systemctl is-active dnsmasq) == active ]]; then
-			systemctl disable dnsmasq
-		fi
-	curl -LO --progress-bar https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/2.0.39/dnscrypt-proxy-linux_x86_64-2.0.39.tar.gz
-	tar -xvf dnscrypt-proxy-linux_x86_64-2.0.39.tar.gz
-	rm dnscrypt-proxy-linux_x86_64-2.0.39.tar.gz
-	cd linux-x86_64
-	cp -f dnscrypt-proxy /usr/sbin/dnscrypt-proxy
-	chmod +x /usr/sbin/dnscrypt-proxy
-	cd ..
-	rm -rf linux-x86_64
-	#adduser --system --no-create-home --disabled-login --group dnscrypt-proxy
-	#useradd -r dnscrypt-proxy --shell=/usr/sbin/nologin
-	setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/dnscrypt-proxy
 	if [[ ! -d /etc/dnscrypt-proxy/ ]]; then
 		mkdir /etc/dnscrypt-proxy/
 	fi
-	wget -P /etc/dnscrypt-proxy/ https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v2/public-resolvers.md -q --show-progress
-	wget -P /etc/dnscrypt-proxy/ https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v2/opennic.md -q --show-progress
-	wget -P /etc/dnscrypt-proxy/ https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v2/relays.md -q --show-progress
 	cat > '/etc/dnscrypt-proxy/blacklist.txt' << EOF
 
 ###########################
@@ -1369,6 +1380,7 @@ if [[ -n $myipv6 ]]; then
 	fi
 fi
     cat > '/etc/dnscrypt-proxy/dnscrypt-proxy.toml' << EOF
+#Do not change these settings unless you know what you are doing !
 listen_addresses = ['127.0.0.1:53']
 user_name = 'nobody'
 max_clients = 250
@@ -1400,7 +1412,7 @@ log_files_max_size = 0
 log_files_max_age = 7
 # Maximum log files backups to keep (or 0 to keep all backups)
 log_files_max_backups = 0
-block_ipv6 = $block_ipv6
+block_ipv6 = false
 ## Immediately respond to A and AAAA queries for host names without a domain name
 block_unqualified = true
 ## Immediately respond to queries for local zones instead of leaking them to
@@ -1485,6 +1497,26 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 systemctl enable dnscrypt-proxy.service
+	if [[ ! -f /usr/sbin/dnscrypt-proxy ]]; then
+	clear
+	colorEcho ${INFO} "安装dnscrypt-proxy(Install dnscrypt-proxy ing)"
+		if [[ $(systemctl is-active dnsmasq) == active ]]; then
+			systemctl disable dnsmasq
+		fi
+	curl -LO --progress-bar https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/2.0.39/dnscrypt-proxy-linux_x86_64-2.0.39.tar.gz
+	tar -xvf dnscrypt-proxy-linux_x86_64-2.0.39.tar.gz
+	rm dnscrypt-proxy-linux_x86_64-2.0.39.tar.gz
+	cd linux-x86_64
+	cp -f dnscrypt-proxy /usr/sbin/dnscrypt-proxy
+	chmod +x /usr/sbin/dnscrypt-proxy
+	cd ..
+	rm -rf linux-x86_64
+	#adduser --system --no-create-home --disabled-login --group dnscrypt-proxy
+	#useradd -r dnscrypt-proxy --shell=/usr/sbin/nologin
+	setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/dnscrypt-proxy
+	wget -P /etc/dnscrypt-proxy/ https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v2/public-resolvers.md -q --show-progress
+	wget -P /etc/dnscrypt-proxy/ https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v2/opennic.md -q --show-progress
+	wget -P /etc/dnscrypt-proxy/ https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v2/relays.md -q --show-progress
 	fi
 fi
 clear
@@ -1842,6 +1874,7 @@ rm -rf /etc/nginx/conf.d/*
 touch /etc/nginx/conf.d/trojan.conf
 if [[ $install_trojan == 1 ]]; then
 	cat > '/etc/nginx/conf.d/trojan.conf' << EOF
+#Do not change these settings unless you know what you are doing !
 server {
 	listen 127.0.0.1:80;
 	server_name $domain;
@@ -1860,6 +1893,7 @@ server {
 EOF
 	else
 	cat > '/etc/nginx/conf.d/trojan.conf' << EOF
+#Do not change these settings unless you know what you are doing !
 server {
 	listen 443 ssl http2;
 	listen [::]:443 ssl http2;
@@ -2265,7 +2299,7 @@ footer a:link {
                     <p><a href="https://$domain$qbtpath" target="_blank">https://$domain$qbtpath</a> 用户名(username): admin 密碼(password): adminadmin</p>
                     <p>Tips:</p>
                     <p>1. 请将Qbittorrent中的Bittorrent加密選項改为 強制加密(Require encryption) ！！！否则會被迅雷吸血！！！</p>
-                    <p>2. 请在Qbittorrent中添加Trackers <a href="https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_all.txt" target="_blank">https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_all.txt</a> ！！！否则速度不會快的！！！</p>
+                    <p>2. 请在Qbittorrent中添加Trackers <a href="https://trackerslist.com/all.txt" target="_blank">https://trackerslist.com/all.txt</a> ！！！否则速度不會快的！！！</p>
                     <p>附：优秀的BT站点推荐(Related Links)</p>
                     <p><a href="https://thepiratebay.org/" target="_blank">https://thepiratebay.org/</a></p>
                     <p><a href="https://sukebei.nyaa.si/" target="_blank">https://sukebei.nyaa.si/</a></p>
