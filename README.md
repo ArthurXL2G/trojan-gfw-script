@@ -6,7 +6,7 @@
 ### How to use
 For Debian/Ubuntu
 ```
-apt-get update && apt-get install sudo curl -y && sudo -i && bash -c "$(curl -fsSL https://raw.githubusercontent.com/johnrosen1/trojan-gfw-script/master/vps.sh)"
+apt-get update && apt-get install sudo curl -y && sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/johnrosen1/trojan-gfw-script/master/vps.sh)"
 ```
 For Centos(not recommended)
 ```
