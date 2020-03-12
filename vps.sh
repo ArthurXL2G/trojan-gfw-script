@@ -23,6 +23,14 @@
 
 #Run me with:
 
+#apt-get update && apt-get install sudo curl -y
+
+#or
+
+#yum update -y && yum install sudo curl -y
+
+#then
+
 #sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/johnrosen1/trojan-gfw-script/master/vps.sh)"
 
 clear
@@ -40,6 +48,18 @@ if [[ $(uname -m 2> /dev/null) != x86_64 ]]; then
 fi
 
 if [[ -f /etc/init.d/aegis ]] || [[ -f /etc/systemd/system/aliyun.service ]]; then
+colorEcho ${INFO} "Uninstall Aliyun aegis ing"
+iptables -I INPUT -s 140.205.201.0/28 -j DROP
+iptables -I INPUT -s 140.205.201.16/29 -j DROP
+iptables -I INPUT -s 140.205.201.32/28 -j DROP
+iptables -I INPUT -s 140.205.225.192/29 -j DROP
+iptables -I INPUT -s 140.205.225.200/30 -j DROP
+iptables -I INPUT -s 140.205.225.184/29 -j DROP
+iptables -I INPUT -s 140.205.225.183/32 -j DROP
+iptables -I INPUT -s 140.205.225.206/32 -j DROP
+iptables -I INPUT -s 140.205.225.205/32 -j DROP
+iptables -I INPUT -s 140.205.225.195/32 -j DROP
+iptables -I INPUT -s 140.205.225.204/32 -j DROP
 systemctl stop aegis
 systemctl stop CmsGoAgent.service
 systemctl stop aliyun
@@ -62,6 +82,13 @@ systemctl disable ecs_mq
 systemctl disable exim4
 systemctl disable apparmor
 systemctl disable sysstat
+killall -9 aegis_cli >/dev/null 2>&1
+killall -9 aegis_update >/dev/null 2>&1
+killall -9 aegis_cli >/dev/null 2>&1
+killall -9 AliYunDun >/dev/null 2>&1
+killall -9 AliHids >/dev/null 2>&1
+killall -9 AliHips >/dev/null 2>&1
+killall -9 AliYunDunUpdate >/dev/null 2>&1
 rm -rf /etc/init.d/aegis
 rm -rf /etc/systemd/system/CmsGoAgent.service
 rm -rf /etc/systemd/system/aliyun.service
@@ -77,6 +104,13 @@ rm -rf /usr/sbin/aliyun_installer
 rm -rf /usr/sbin/aliyun-service
 rm -rf /usr/sbin/aliyun-service.backup
 rm -rf /sbin/ecs_mq_rps_rfs
+for ((var=2; var<=5; var++)) do
+	if [ -d "/etc/rc${var}.d/" ];then
+		rm -rf "/etc/rc${var}.d/S80aegis"
+	elif [ -d "/etc/rc.d/rc${var}.d" ];then
+		rm -rf "/etc/rc.d/rc${var}.d/S80aegis"
+	fi
+done
 apt-get purge sysstat exim4 chrony aliyun-assist telnet -y
 systemctl daemon-reload
 	if [[ $(lsb_release -cs) == stretch ]]; then
@@ -191,9 +225,6 @@ export LANGUAGE="en_US.UTF-8"
 export LANG="en_US.UTF-8"
 export LC_ALL="en_US.UTF-8"
 fi
-#chattr +i /etc/locale.gen
-#dpkg-reconfigure --frontend=noninteractive locales
-#chattr +i /etc/default/locale
 }
 #############################
 installacme(){
@@ -347,7 +378,7 @@ if [[ ${test1} == 0 ]] && [[ ${test2} == 0 ]] && [[ ${test3} == 0 ]] && [[ -z ${
 fi
 
 clear
-if [[ $install_status == 1 ]]; then
+if [[ ${install_status} == 1 ]]; then
 if (whiptail --title "Installed Detected" --defaultno --yesno "检测到已安装，是否继续?" 8 78); then
     if (whiptail --title "Installed Detected" --defaultno --yesno "检测到已安装，是否重新设置具体参数?" 8 78); then
     :
@@ -428,7 +459,7 @@ do
 	esac
 done < results
 ####################################
-if [[ $system_upgrade = 1 ]]; then
+if [[ ${system_upgrade} == 1 ]]; then
 	if [[ $(lsb_release -cs) == stretch ]]; then
 		if (whiptail --title "System Upgrade" --yesno "Upgrade to Debian 10?" 8 78); then
 			debian10_install=1
@@ -446,23 +477,23 @@ if [[ $system_upgrade = 1 ]]; then
 	fi
 fi
 #####################################
-while [[ -z $domain ]]; do
+while [[ -z ${domain} ]]; do
 domain=$(whiptail --inputbox --nocancel "快輸入你的域名並按回車(请先完成A/AAAA解析 https://dnschecker.org/)" 8 78 --title "Domain input" 3>&1 1>&2 2>&3)
 if (whiptail --title "hostname" --yesno "修改hostname为域名(change hostname to your domain)?" 8 78); then
 	hostnamectl set-hostname $domain
 	echo "127.0.0.1 $domain" >> /etc/hosts
 fi
 done
-if [[ $install_trojan = 1 ]]; then
-	while [[ -z $password1 ]]; do
+if [[ ${install_trojan} = 1 ]]; then
+	while [[ -z ${password1} ]]; do
 password1=$(whiptail --passwordbox --nocancel "快輸入你想要的Trojan-GFW密碼一併按回車(若不確定，請直接回車，会随机生成)" 8 78 --title "password1 input" 3>&1 1>&2 2>&3)
-if [[ $password1 == "" ]]; then
+if [[ -z ${password1} ]]; then
 	password1=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 20 ; echo '' )
 	fi
 done
-while [[ -z $password2 ]]; do
+while [[ -z ${password2} ]]; do
 password2=$(whiptail --passwordbox --nocancel "快輸入想要的Trojan-GFW密碼二並按回車(若不確定，請直接回車，会随机生成)" 8 78 --title "password2 input" 3>&1 1>&2 2>&3)
-if [[ $password2 == "" ]]; then
+if [[ -z ${password2} ]]; then
 	password2=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 20 ; echo '' )
 	fi
 done
@@ -474,43 +505,43 @@ fi
 		done
 	fi
 #####################################
-	if [[ $install_tracker = 1 ]]; then
-		while [[ -z $trackerpath ]]; do
+	if [[ $install_tracker == 1 ]]; then
+		while [[ -z ${trackerpath} ]]; do
 		trackerpath=$(whiptail --inputbox --nocancel "快输入你的想要的Bittorrent-Tracker路径并按回车" 8 78 /announce --title "Bittorrent-Tracker path input" 3>&1 1>&2 2>&3)
 		done
-		while [[ -z $trackerstatuspath ]]; do
+		while [[ -z ${trackerstatuspath} ]]; do
 		trackerstatuspath=$(whiptail --inputbox --nocancel "快输入你的想要的Bittorrent-Tracker状态路径并按回车" 8 78 /status --title "Bittorrent-Tracker status path input" 3>&1 1>&2 2>&3)
 		done
 	fi
 ####################################
-	if [[ $install_aria = 1 ]]; then
-		while [[ -z $ariapath ]]; do
+	if [[ ${install_aria} == 1 ]]; then
+		while [[ -z ${ariapath} ]]; do
 		ariapath=$(whiptail --inputbox --nocancel "快输入你的想要的Aria2 RPC路径并按回车" 8 78 /jsonrpc --title "Aria2 path input" 3>&1 1>&2 2>&3)
 		done
 		while [[ -z $ariapasswd ]]; do
 		ariapasswd=$(whiptail --passwordbox --nocancel "快输入你的想要的Aria2 rpc token并按回车" 8 78 --title "Aria2 rpc token input" 3>&1 1>&2 2>&3)
-		if [[ $ariapasswd == "" ]]; then
+		if [[ -z ${ariapasswd} ]]; then
 		ariapasswd="123456789"
 		fi
 		done
 	fi
 ####################################
-	if [[ $install_file = 1 ]]; then
-		while [[ -z $filepath ]]; do
+	if [[ ${install_file} = 1 ]]; then
+		while [[ -z ${filepath} ]]; do
 		filepath=$(whiptail --inputbox --nocancel "快输入你的想要的Filebrowser路径并按回车" 8 78 /files/ --title "Filebrowser path input" 3>&1 1>&2 2>&3)
 		done
 	fi
 ####################################
-	if [[ $install_netdata = 1 ]]; then
-		while [[ -z $netdatapath ]]; do
+	if [[ ${install_netdata} = 1 ]]; then
+		while [[ -z ${netdatapath} ]]; do
 		netdatapath=$(whiptail --inputbox --nocancel "快输入你的想要的Netdata路径并按回车" 8 78 /netdata/ --title "Netdata path input" 3>&1 1>&2 2>&3)
 		done
 	fi
 ####################################
-	if [[ $install_tor = 1 ]]; then
-		while [[ -z $tor_name ]]; do
+	if [[ ${install_tor} = 1 ]]; then
+		while [[ -z ${tor_name} ]]; do
 		tor_name=$(whiptail --inputbox --nocancel "快輸入想要的tor nickname並按回車" 8 78 --title "tor nickname input" 3>&1 1>&2 2>&3)
-		if [[ $tor_name == "" ]]; then
+		if [[ -z ${tor_name} ]]; then
 		tor_name="myrelay"
 	fi
 	done
@@ -528,7 +559,7 @@ fi
 ####################################
 if [[ -f /etc/trojan/trojan.crt ]] && [[ -f /etc/trojan/trojan.key ]] && [[ -n /etc/trojan/trojan.crt ]]; then
 		TERM=ansi whiptail --title "证书已有，跳过申请" --infobox "证书已有，跳过申请。。。" 8 78
-		else		
+		else
 	if (whiptail --title "api" --yesno --defaultno "使用 (use) api申请证书(to issue certificate)?" 8 78); then
     dns_api=1
     APIOPTION=$(whiptail --nocancel --clear --ok-button "吾意已決 立即執行" --title "API choose" --menu --separate-output "域名(domain)API：請按方向键來選擇(Use Arrow key to choose)" 15 78 6 \
@@ -541,7 +572,7 @@ if [[ -f /etc/trojan/trojan.crt ]] && [[ -f /etc/trojan/trojan.key ]] && [[ -n /
 
     case $APIOPTION in
         1)
-        while [[ -z $CF_Key ]] || [[ -z $CF_Email ]]; do
+        while [[ -z ${CF_Key} ]] || [[ -z ${CF_Email} ]]; do
         CF_Key=$(whiptail --passwordbox --nocancel "https://dash.cloudflare.com/profile/api-tokens，快輸入你CF Global Key併按回車" 8 78 --title "CF_Key input" 3>&1 1>&2 2>&3)
         CF_Email=$(whiptail --inputbox --nocancel "https://dash.cloudflare.com/profile，快輸入你CF_Email併按回車" 8 78 --title "CF_Key input" 3>&1 1>&2 2>&3)
         done
@@ -632,13 +663,13 @@ colorEcho ${INFO} "初始化中(initializing)"
 	pack="apt-get -y -qq"
 	apt-get update -q
 	export DEBIAN_FRONTEND=noninteractive
-	apt-get install sudo whiptail curl locales lsb-release jq lsof -y -qq
+	apt-get install whiptail curl locales lsb-release jq lsof -y -qq
  elif cat /etc/*release | grep ^NAME | grep -q Debian; then
 	dist=debian
 	pack="apt-get -y -qq"
 	apt-get update -q
 	export DEBIAN_FRONTEND=noninteractive
-	apt-get install sudo whiptail curl locales lsb-release jq lsof -y -qq
+	apt-get install whiptail curl locales lsb-release jq lsof -y -qq
  else
 	TERM=ansi whiptail --title "OS not SUPPORTED" --infobox "OS NOT SUPPORTED!" 8 78
 	exit 1;
@@ -1079,7 +1110,6 @@ if [[ $install_qbt == 1 ]]; then
 	yum update -y -q
 	yum install qbittorrent-nox -y -q
  fi
- #adduser --system --no-create-home --disabled-login --group qbittorrent
  #useradd -r qbittorrent --shell=/usr/sbin/nologin
 	cat > '/etc/systemd/system/qbittorrent.service' << EOF
 [Unit]
@@ -1089,7 +1119,6 @@ Wants=network-online.target
 After=network-online.target nss-lookup.target
 
 [Service]
-# if you have systemd >= 240, you probably want to use Type=exec instead
 Type=simple
 User=root
 RemainAfterExit=yes
@@ -1128,7 +1157,6 @@ if [[ $install_tracker = 1 ]]; then
 	curl -sL https://rpm.nodesource.com/setup_13.x | bash -
 	yum install -y -q nodejs
  fi
- #adduser --system --no-create-home --disabled-login --group bt_tracker
  useradd -r bt_tracker --shell=/usr/sbin/nologin
  npm install -g bittorrent-tracker --quiet
 	cat > '/etc/systemd/system/tracker.service' << EOF
@@ -1138,7 +1166,6 @@ Wants=network-online.target
 After=network-online.target nss-lookup.target
 
 [Service]
-# if you have systemd >= 240, you probably want to use Type=exec instead
 Type=simple
 User=bt_tracker
 Group=bt_tracker
@@ -1289,7 +1316,6 @@ EOF
 	if [[ ! -f /usr/local/bin/aria2c ]]; then
 	clear
 	colorEcho ${INFO} "安装aria2(Install aria2 ing)"
-	#adduser --system --no-create-home --disabled-login --group aria2
 	#usermod -a -G aria2 nginx
 	useradd -r aria2 --shell=/usr/sbin/nologin
 	if [[ $dist != centos ]]; then
@@ -1510,8 +1536,6 @@ systemctl enable dnscrypt-proxy.service
 	chmod +x /usr/sbin/dnscrypt-proxy
 	cd ..
 	rm -rf linux-x86_64
-	#adduser --system --no-create-home --disabled-login --group dnscrypt-proxy
-	#useradd -r dnscrypt-proxy --shell=/usr/sbin/nologin
 	setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/dnscrypt-proxy
 	wget -P /etc/dnscrypt-proxy/ https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v2/public-resolvers.md -q --show-progress
 	wget -P /etc/dnscrypt-proxy/ https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v2/opennic.md -q --show-progress
@@ -1831,10 +1855,10 @@ openfirewall(){
 		ip6tables -I INPUT -p udp -m udp --dport 8000 -j ACCEPT
 	fi
 	if [[ $install_aria == 1 ]]; then
-		iptables -I INPUT -p tcp -m tcp --dport $ariaport -j ACCEPT
-		ip6tables -I INPUT -p tcp -m tcp --dport $ariaport -j ACCEPT
-		iptables -I INPUT -p udp -m udp --dport $ariaport -j ACCEPT
-		ip6tables -I INPUT -p udp -m udp --dport $ariaport -j ACCEPT
+		iptables -I INPUT -p tcp -m tcp --dport ${ariaport} -j ACCEPT
+		ip6tables -I INPUT -p tcp -m tcp --dport ${ariaport} -j ACCEPT
+		iptables -I INPUT -p udp -m udp --dport ${ariaport} -j ACCEPT
+		ip6tables -I INPUT -p udp -m udp --dport ${ariaport} -j ACCEPT
 	fi
 	if [[ $dist == debian ]]; then
 	export DEBIAN_FRONTEND=noninteractive 
@@ -1877,12 +1901,13 @@ if [[ $install_trojan == 1 ]]; then
 server {
 	listen 127.0.0.1:80;
 	server_name $domain;
+	if (\$http_user_agent ~* (wget|curl) ) { return 444; }
 	if (\$http_user_agent = "") { return 444; }
 	if (\$host != "$domain") { return 404; }
 	add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-	add_header X-Frame-Options SAMEORIGIN always;
-	add_header X-Content-Type-Options "nosniff" always;
-	add_header Referrer-Policy "no-referrer";
+	#add_header X-Frame-Options SAMEORIGIN always;
+	#add_header X-Content-Type-Options "nosniff" always;
+	#add_header Referrer-Policy "no-referrer";
 	#add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://ssl.google-analytics.com https://assets.zendesk.com https://connect.facebook.net; img-src 'self' https://ssl.google-analytics.com https://s-static.ak.facebook.com https://assets.zendesk.com; style-src 'self' https://fonts.googleapis.com https://assets.zendesk.com; font-src 'self' https://themes.googleusercontent.com; frame-src https://assets.zendesk.com https://www.facebook.com https://s-static.ak.facebook.com https://tautt.zendesk.com; object-src 'none'";
 	#add_header Feature-Policy "geolocation none;midi none;notifications none;push none;sync-xhr none;microphone none;camera none;magnetometer none;gyroscope none;speaker self;vibrate none;fullscreen self;payment none;";
 	location / {
@@ -1914,13 +1939,14 @@ server {
 	resolver_timeout 10s;
 	server_name           $domain;
 	#add_header alt-svc 'quic=":443"; ma=2592000; v="46"';
-	add_header X-Frame-Options SAMEORIGIN always;
-	add_header X-Content-Type-Options "nosniff" always;
-	add_header X-XSS-Protection "1; mode=block" always;
-	add_header Referrer-Policy "no-referrer";
+	#add_header X-Frame-Options SAMEORIGIN always;
+	#add_header X-Content-Type-Options "nosniff" always;
+	#add_header X-XSS-Protection "1; mode=block" always;
+	#add_header Referrer-Policy "no-referrer";
 	add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
 	#add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://ssl.google-analytics.com https://assets.zendesk.com https://connect.facebook.net; img-src 'self' https://ssl.google-analytics.com https://s-static.ak.facebook.com https://assets.zendesk.com; style-src 'self' https://fonts.googleapis.com https://assets.zendesk.com; font-src 'self' https://themes.googleusercontent.com; frame-src https://assets.zendesk.com https://www.facebook.com https://s-static.ak.facebook.com https://tautt.zendesk.com; object-src 'none'";
 	#add_header Feature-Policy "geolocation none;midi none;notifications none;push none;sync-xhr none;microphone none;camera none;magnetometer none;gyroscope none;speaker self;vibrate none;fullscreen self;payment none;";
+	if (\$http_user_agent ~* (wget|curl) ) { return 444; }
 	if (\$http_user_agent = "") { return 444; }
 	if (\$host != "$domain") { return 404; }
 	location / {
@@ -2033,14 +2059,14 @@ echo "server {" >> /etc/nginx/conf.d/trojan.conf
 echo "    listen 80;" >> /etc/nginx/conf.d/trojan.conf
 echo "    listen [::]:80;" >> /etc/nginx/conf.d/trojan.conf
 echo "    server_name $domain;" >> /etc/nginx/conf.d/trojan.conf
-echo "    return 301 https://$domain;" >> /etc/nginx/conf.d/trojan.conf
+echo "    return 301 https://$domain\$request_uri;" >> /etc/nginx/conf.d/trojan.conf
 echo "}" >> /etc/nginx/conf.d/trojan.conf
 echo "" >> /etc/nginx/conf.d/trojan.conf
 echo "server {" >> /etc/nginx/conf.d/trojan.conf
 echo "    listen 80 default_server;" >> /etc/nginx/conf.d/trojan.conf
 echo "    listen [::]:80 default_server;" >> /etc/nginx/conf.d/trojan.conf
 echo "    server_name _;" >> /etc/nginx/conf.d/trojan.conf
-echo "    return 444;" >> /etc/nginx/conf.d/trojan.conf
+echo "    return 404;" >> /etc/nginx/conf.d/trojan.conf
 echo "}" >> /etc/nginx/conf.d/trojan.conf
 if [[ $install_netdata == 1 ]]; then
 echo "server {" >> /etc/nginx/conf.d/trojan.conf
@@ -2431,8 +2457,8 @@ footer a:link {
                     </ul>
                     <p>Dnscrypt-proxy</p>
                     <ul>
-                        <li><code>sudo nano /etc/dnscrypt-proxy.toml</code></li>
-                        <li><code>sudo nano /etc/dnscrypt-proxy.toml</code></li>
+                        <li><code>sudo nano /etc/dnscrypt-proxy/dnscrypt-proxy.toml</code></li>
+                        <li><code>sudo nano /etc/dnscrypt-proxy/dnscrypt-proxy.toml</code></li>
                     </ul>
                     <p>Aria2</p>
                     <ul>
@@ -2682,7 +2708,6 @@ if cat /root/.trojan/trojan_version.txt | grep \$trojanversion > /dev/null; then
 fi
 EOF
 crontab -l | grep -q '0 * * * * bash /root/.trojan/autoupdate.sh'  && echo 'cron exists' || echo "0 * * * * bash /root/.trojan/autoupdate.sh" | crontab
-#echo "0 * * * * bash /root/.trojan/autoupdate.sh" | crontab
 	fi
 }
 ###################################
@@ -2693,14 +2718,11 @@ logcheck(){
 	if [[ -f /usr/local/bin/trojan ]]; then
 		colorEcho ${INFO} "Trojan Log"
 		journalctl -a -u trojan.service
-		#less /var/log/trojan.log
 		less /root/.trojan/update.log
 	fi
 	if [[ -f /usr/sbin/dnscrypt-proxy ]]; then
 		colorEcho ${INFO} "dnscrypt-proxy Log"
 		journalctl -a -u dnscrypt-proxy.service
-		#less /var/log/dnscrypt-proxy/dnscrypt-proxy.log
-		#less /var/log/dnscrypt-proxy/query.log
 	fi
 	if [[ -f /usr/local/bin/aria2c ]]; then
 		colorEcho ${INFO} "Aria2 Log"
@@ -2721,16 +2743,17 @@ bandwithusage(){
 advancedMenu() {
 	Mainmenu=$(whiptail --clear --ok-button "吾意已決 立即安排" --backtitle "hi" --title "VPS ToolBox Menu" --menu --nocancel "Choose an option: https://github.com/johnrosen1/trojan-gfw-script
 运行此脚本前请在控制面板中开启80 443端口并关闭Cloudflare CDN!" 13 78 4 \
-	"1" "安裝(Install)" \
-	"2" "结果(Result)" \
-	"3" "日志(Log)" \
-	"4" "流量(Bandwith)" \
-	"5" "状态(Status)" \
-	"6" "更新(Update)" \
-	"7" "卸載(Uninstall)" \
-	"8" "退出(Quit)" 3>&1 1>&2 2>&3)
+	"Install" "安裝" \
+	"Result" "结果" \
+	"Benchmark" "效能"\
+	"Log" "日志" \
+	"Bandwith" "流量" \
+	"Status" "状态" \
+	"Update" "更新" \
+	"Uninstall" "卸載" \
+	"Exit" "退出" 3>&1 1>&2 2>&3)
 	case $Mainmenu in
-		1)
+		Install)
 		cd
 		clear
 		userinput
@@ -2790,35 +2813,73 @@ advancedMenu() {
 		reboot
 		fi
 		;;
-		2)
+		Result)
 		cd
 		whiptail --title "Install Success" --textbox --scrolltext /root/.trojan/result.txt 8 120
 		advancedMenu
 		;;
-		3)
+		Benchmark)
+		clear
+		colorEcho ${INFO} "Hardware Benchmark"
+		curl -LO --progress-bar http://cdn.geekbench.com/Geekbench-5.1.0-Linux.tar.gz
+		tar -xvf Geekbench-5.1.0-Linux.tar.gz
+		rm -rf Geekbench-5.1.0-Linux.tar.gz
+		cd Geekbench-5.1.0-Linux
+		./geekbench_x86_64
+		cd ..
+		rm -rf Geekbench-5.1.0-Linux
+		colorEcho ${INFO} "Please the result then hit enter to proceed"
+		read var
+		colorEcho ${INFO} "Network Benchmark"
+		if [[ ${dist} != centos ]]; then
+			apt-get install gnupg apt-transport-https dirmngr -y -qq
+		INSTALL_KEY="379CE192D401AB61"
+		# Ubuntu versions supported: xenial, bionic
+		# Debian versions supported: jessie, stretch, buster
+		DEB_DISTRO=$(lsb_release -sc)
+		apt-key adv --keyserver keyserver.ubuntu.com --recv-keys $INSTALL_KEY
+		echo "deb https://ookla.bintray.com/debian ${DEB_DISTRO} main" | sudo tee  /etc/apt/sources.list.d/speedtest.list
+		apt-get update -q
+		# Other non-official binaries will conflict with Speedtest CLI
+		# Example how to remove using apt-get
+		apt-get purge speedtest-cli -y
+		apt-get install speedtest -y -qq
+			else
+			yum install wget -y
+			wget https://bintray.com/ookla/rhel/rpm -O bintray-ookla-rhel.repo
+			sudo mv bintray-ookla-rhel.repo /etc/yum.repos.d/
+			# Other non-official binaries will conflict with Speedtest CLI
+			# Example how to remove using yum
+			rpm -qa | grep speedtest | xargs -I {} sudo yum -y remove {}
+			yum install speedtest -y
+		fi
+		speedtest
+		colorEcho ${INFO} "Benchmark complete"
+		;;
+		Log)
 		cd
 		logcheck
 		advancedMenu
 		;;
-		4)
+		Bandwith)
 		cd
 		bandwithusage
 		;;
-		5)
+		Status)
 		cd
 		statuscheck
 		;;
-		6)
+		Update)
 		cd
 		checkupdate
 		colorEcho ${SUCCESS} "RTFM: https://github.com/johnrosen1/trojan-gfw-script"
 		;;
-		7)
+		Uninstall)
 		cd
 		uninstall
 		colorEcho ${SUCCESS} "Remove complete"
 		;;
-		8)
+		Exit)
 		exit
 		whiptail --title "脚本已退出" --msgbox "脚本已退出(Bash Exited) RTFM: https://github.com/johnrosen1/trojan-gfw-script" 8 78
 		;;
@@ -2844,8 +2905,8 @@ EOF
 	fi
 fi
 clear
-ip1=$(curl -s https://ipinfo.io?token=56c375418c62c9)
-myip=$(curl -s https://ipinfo.io/ip?token=56c375418c62c9)
+ip1=$(curl -s https://ipinfo.io?token=56c375418c62c9 --connect-timeout 10)
+myip=$(curl -s https://ipinfo.io/ip?token=56c375418c62c9 --connect-timeout 10)
 localip=$(ip a | grep inet | grep "scope global" | awk '{print $2}' | cut -d'/' -f1)
 myipv6=$(ip -6 a | grep inet6 | grep "scope global" | awk '{print $2}' | cut -d'/' -f1)
 advancedMenu
